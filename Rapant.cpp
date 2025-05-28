@@ -627,8 +627,8 @@ static int GetInt(vector<string> vs, string name, int def) {
 
 static void PrintBoard() {
 	int r, f, sq;
-	string uw = "PNBRQKXX";
-	string ub = "pnbrqkxx";
+	string uw = "ANBRQKXX";
+	string ub = "anbrqkxx";
 	string s = "   +---+---+---+---+---+---+---+---+";
 	string t = "     A   B   C   D   E   F   G   H";
 	cout << t << endl;
