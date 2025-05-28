@@ -1,4 +1,4 @@
-# RapCpw
+# Rapant
 
 <div align="center" style="padding-top: 50px">
 <img src="/Resources/rapant.png" />
