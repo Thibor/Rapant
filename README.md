@@ -4,7 +4,7 @@
 <img src="/Resources/rapant.png" />
     <br>
     <br>
-    <b><i>Uci chess engine 1500 elo.</i></b>
+    <b><i>Uci chess engine 2000 elo.</i></b>
     <br>
     <br>
     <img src="https://img.shields.io/github/downloads/Thibor/Rapant/total?color=critical&style=for-the-badge">
