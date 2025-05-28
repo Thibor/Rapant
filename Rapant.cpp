@@ -634,16 +634,16 @@ static void PrintBoard() {
 	cout << t << endl;
 	for (r = 7; r >= 0; r--) {
 		cout << s << endl;
-		printf(" %d |", r + 1);
+		cout << " " << r + 1 << " |";
 		for (f = 0; f <= 7; f++) {
 			sq = SQ(f, 7 - r);
 			int piece = board.board[sq];
 			if (!piece)
-				printf("   |");
+				cout << "   |";
 			else if (piece & WHITE)
-				printf(" %c |", uw[piece & 0x7]);
+				cout << " " << uw[piece & 0x7] << " |";
 			else if (piece & BLACK)
-				printf(" %c |", ub[piece & 0x7]);
+				cout << " " << ub[piece & 0x7] << " |";
 		}
 		cout << endl;
 	}
