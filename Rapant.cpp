@@ -504,7 +504,7 @@ static void PrintBestMove(int move) {
 	cout << "bestmove " << MoveToUci(move) << endl;
 }
 
-static int ABSearch(SBoard& InBoard, int alpha, int beta, int depth, int ahead, int& BestMove, int bNull)
+static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahead, int& BestMove, int bNull)
 {
 	SMovelist Moves = {};
 	SBoard Board = {};
@@ -528,7 +528,7 @@ static int ABSearch(SBoard& InBoard, int alpha, int beta, int depth, int ahead, 
 		if (bNull && depth > 2 && !bInCheck
 			&& ((Color == WHITE && InBoard.WMat > 400) || (Color == BLACK && InBoard.BMat > 400))) {
 			InBoard.color = SWITCH(InBoard.color);
-			Eval = -ABSearch(InBoard, -beta, -beta + 1, depth - 3, ahead, NextBest, false);
+			Eval = -SearchAlpha(InBoard, -beta, -beta + 1, depth - 3, ahead, NextBest, false);
 			InBoard.color = SWITCH(InBoard.color);
 			if (Eval == -TIME)
 				return TIME;
@@ -539,7 +539,7 @@ static int ABSearch(SBoard& InBoard, int alpha, int beta, int depth, int ahead, 
 	}
 
 	if (BestMove < 100 && depth > 2) {
-		Eval = ABSearch(InBoard, alpha, beta, depth - 2, ahead + 1, BestMove, true);
+		Eval = SearchAlpha(InBoard, alpha, beta, depth - 2, ahead + 1, BestMove, true);
 		if (Eval == TIME) return TIME;
 	}
 	Moves.ScoreMoves(InBoard, Color, BestMove);
@@ -562,7 +562,7 @@ static int ABSearch(SBoard& InBoard, int alpha, int beta, int depth, int ahead, 
 		}
 		if (Eval == -32000)
 		{
-			Eval = -ABSearch(Board, -beta, -alpha, (bInCheck) ? (depth) : (depth - 1), ahead + 1, NextBest, true);
+			Eval = -SearchAlpha(Board, -beta, -alpha, (bInCheck) ? (depth) : (depth - 1), ahead + 1, NextBest, true);
 			if (Eval == -TIME) return TIME;
 		}
 		if (depth > 1)
@@ -586,7 +586,7 @@ static void ComputerMove(SBoard& board, int& move, int& eval) {
 	g_start = clock();
 	int SearchEval, SearchMove;
 	for (int nDepth = 1; nDepth <= g_max_depth; nDepth++) {
-		SearchEval = ABSearch(board, -30000, 20001 - nDepth, nDepth, 0, SearchMove, false);
+		SearchEval = SearchAlpha(board, -30000, 20001 - nDepth, nDepth, 0, SearchMove, false);
 		if (SearchEval != TIME)
 			eval = SearchEval;
 		if (SearchMove > 100)
@@ -629,22 +629,26 @@ static void PrintBoard() {
 	int r, f, sq;
 	string uw = "PNBRQKXX";
 	string ub = "pnbrqkxx";
-	cout << "    a b c d e f g h" << endl;
-	cout << "   ----------------" << endl;
+	string s = "   +---+---+---+---+---+---+---+---+";
+	string t = "     A   B   C   D   E   F   G   H";
+	cout << t << endl;
 	for (r = 7; r >= 0; r--) {
-		printf(" %d|", r + 1);
+		cout << s << endl;
+		printf(" %d |", r + 1);
 		for (f = 0; f <= 7; f++) {
 			sq = SQ(f, 7 - r);
 			int piece = board.board[sq];
 			if (!piece)
-				printf(" .");
+				printf("   |");
 			else if (piece & WHITE)
-				printf(" %c", uw[piece & 0x7]);
+				printf(" %c |", uw[piece & 0x7]);
 			else if (piece & BLACK)
-				printf(" %c", ub[piece & 0x7]);
+				printf(" %c |", ub[piece & 0x7]);
 		}
 		cout << endl;
 	}
+	cout << s << endl;
+	cout << t << endl;
 }
 
 static void ParsePosition(vector<string> commands) {
