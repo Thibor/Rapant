@@ -134,6 +134,8 @@ struct SBoard
 		Eval = 0;
 		nMoves = 0;
 		WMat = BMat = 0;
+		EPsq = 0;
+		Castling = 0xf;
 		Clear();
 		int sq = 21;
 		string ele = fen[0];
@@ -151,8 +153,7 @@ struct SBoard
 			case 'R':WMat += MPieceValues[ROOK]; board[sq] = ROOK | WHITE; Eval += EvalSq[(ROOK << 7) + sq]; sq++; break;
 			case 'Q':WMat += MPieceValues[QUEEN]; board[sq] = QUEEN | WHITE; Eval += EvalSq[(QUEEN << 7) + sq]; sq++; break;
 			case 'K':WKsq = sq; board[sq] = KING | WHITE; Eval += EvalSq[(KING << 7) + sq]; sq++; break;
-			case '/': sq += 2; break;
-			case '1': sq++; break;
+			case '1': sq += 1; break;
 			case '2': sq += 2; break;
 			case '3': sq += 3; break;
 			case '4': sq += 4; break;
@@ -160,12 +161,12 @@ struct SBoard
 			case '6': sq += 6; break;
 			case '7': sq += 7; break;
 			case '8': sq += 8; break;
+			case '/': sq += 2; break;
 			}
 
 		ele = fen[1];
 		color = (ele == "w") ? WHITE : BLACK;
 
-		Castling = 0xf;
 		ele = fen[2];
 		for (char c : ele)
 			switch (c)
@@ -183,6 +184,14 @@ struct SBoard
 				Castling ^= B_QS;
 				break;
 			}
+
+		ele = fen[3];
+		if (ele != "-")
+		{
+			int file = ele[0] - 'a';
+			int rank = 7 - (ele[1] - '1');
+			EPsq = SQ(file, rank);
+		}
 	}
 
 	int CanCastleKS(const int Color) const {
@@ -688,9 +697,11 @@ static void UciLoop() {
 			ParsePosition(commands);
 		else if (commands[0] == "go") {
 			g_max_depth = GetInt(commands, "depth", 0xff);
-			g_max_time = GetInt(commands, "movetime", 0);
+			g_max_time = GetInt(commands, board.color == WHITE ? "wtime" : "btime", 0) / 30;
 			if (!g_max_time)
-				g_max_time = GetInt(commands, board.color == WHITE ? "wtime" : "btime", 0) / 30;
+				g_max_time = GetInt(commands, "movetime", 0xffffff);
+
+
 			move = 0;
 			ComputerMove(board, move, eval);
 			if (move) {
