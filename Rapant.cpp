@@ -15,7 +15,7 @@
 
 using namespace std;
 
-const int HASH_SIZE = 1 << 20;
+const int HASH_SIZE = 1 << 21;
 const int INVALID = 32, EMPTY = 0, WHITE = 8, BLACK = 16, PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5;
 const int TIME = 300000;
 const int B_QS = 4, B_KS = 8, W_QS = 1, W_KS = 2;
