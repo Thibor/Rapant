@@ -614,7 +614,7 @@ static void ComputerMove(SBoard& board, int& move, int& eval) {
 			eval = SearchEval;
 		if (SearchMove > 100)
 			move = SearchMove;
-		if (g_max_time && ((clock() - g_start) > (g_max_time / 8)))
+		if (g_max_time && ((clock() - g_start) > (g_max_time / 4)))
 			break;
 		if (abs(eval) >= (20001 - nDepth))
 			break;
