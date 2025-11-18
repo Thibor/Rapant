@@ -127,17 +127,17 @@ struct SBoard
 		string ele = fen[0];
 		for (char c : ele)
 			switch (c) {
-			case 'p':BMat += board[sq] = PAWN | BLACK; Eval += EvalSq[(PAWN << 7) + sq]; sq++; break;
-			case 'n':BMat += PieceValues[KNIGHT]; board[sq] = KNIGHT | BLACK; Eval += EvalSq[(KNIGHT << 7) + sq]; sq++; break;
-			case 'b':BMat += PieceValues[BISHOP]; board[sq] = BISHOP | BLACK; Eval += EvalSq[(BISHOP << 7) + sq]; sq++; break;
-			case 'r':BMat += PieceValues[ROOK]; board[sq] = ROOK | BLACK; Eval += EvalSq[(ROOK << 7) + sq]; sq++; break;
-			case 'q':BMat += PieceValues[QUEEN]; board[sq] = QUEEN | BLACK; Eval += EvalSq[(QUEEN << 7) + sq]; sq++; break;
-			case 'k':BKsq = sq;  board[sq] = KING | BLACK; sq++; Eval += EvalSq[(KING << 7) + sq]; break;
-			case 'P':WMat += board[sq] = PAWN | WHITE; Eval += EvalSq[(PAWN << 7) + sq]; sq++; break;
-			case 'N':WMat += PieceValues[KNIGHT]; board[sq] = KNIGHT | WHITE; Eval += EvalSq[(KNIGHT << 7) + sq]; sq++; break;
-			case 'B':WMat += PieceValues[BISHOP]; board[sq] = BISHOP | WHITE; Eval += EvalSq[(BISHOP << 7) + sq]; sq++; break;
-			case 'R':WMat += PieceValues[ROOK]; board[sq] = ROOK | WHITE; Eval += EvalSq[(ROOK << 7) + sq]; sq++; break;
-			case 'Q':WMat += PieceValues[QUEEN]; board[sq] = QUEEN | WHITE; Eval += EvalSq[(QUEEN << 7) + sq]; sq++; break;
+			case 'p':Eval += EvalSq[((PAWN | BLACK) << 7) + sq]; board[sq] = PAWN | BLACK; Eval += EvalSq[(PAWN << 7) + sq]; sq++; break;
+			case 'n':Eval += EvalSq[((KNIGHT | BLACK) << 7) + sq]; BMat += PieceValues[KNIGHT]; board[sq] = KNIGHT | BLACK; Eval += EvalSq[(KNIGHT << 7) + sq]; sq++; break;
+			case 'b':Eval += EvalSq[((BISHOP | BLACK) << 7) + sq]; BMat += PieceValues[BISHOP]; board[sq] = BISHOP | BLACK; Eval += EvalSq[(BISHOP << 7) + sq]; sq++; break;
+			case 'r':Eval += EvalSq[((ROOK | BLACK) << 7) + sq]; BMat += PieceValues[ROOK]; board[sq] = ROOK | BLACK; Eval += EvalSq[(ROOK << 7) + sq]; sq++; break;
+			case 'q':Eval += EvalSq[((QUEEN | BLACK) << 7) + sq]; BMat += PieceValues[QUEEN]; board[sq] = QUEEN | BLACK; Eval += EvalSq[(QUEEN << 7) + sq]; sq++; break;
+			case 'k':Eval += EvalSq[((KING | BLACK) << 7) + sq]; BKsq = sq;  board[sq] = KING | BLACK; sq++; Eval += EvalSq[(KING << 7) + sq]; break;
+			case 'P':Eval += EvalSq[((PAWN | WHITE) << 7) + sq]; board[sq] = PAWN | WHITE; Eval += EvalSq[(PAWN << 7) + sq]; sq++; break;
+			case 'N':Eval += EvalSq[((KNIGHT | WHITE) << 7) + sq]; WMat += PieceValues[KNIGHT]; board[sq] = KNIGHT | WHITE; Eval += EvalSq[(KNIGHT << 7) + sq]; sq++; break;
+			case 'B':Eval += EvalSq[((BISHOP | WHITE) << 7) + sq]; WMat += PieceValues[BISHOP]; board[sq] = BISHOP | WHITE; Eval += EvalSq[(BISHOP << 7) + sq]; sq++; break;
+			case 'R':Eval += EvalSq[((ROOK | WHITE) << 7) + sq]; WMat += PieceValues[ROOK]; board[sq] = ROOK | WHITE; Eval += EvalSq[(ROOK << 7) + sq]; sq++; break;
+			case 'Q':Eval += EvalSq[((QUEEN | WHITE) << 7) + sq]; WMat += PieceValues[QUEEN]; board[sq] = QUEEN | WHITE; Eval += EvalSq[(QUEEN << 7) + sq]; sq++; break;
 			case 'K':WKsq = sq; board[sq] = KING | WHITE; Eval += EvalSq[(KING << 7) + sq]; sq++; break;
 			case '1': sq += 1; break;
 			case '2': sq += 2; break;
@@ -482,7 +482,7 @@ static string GetPv(SBoard& inBoard, int move, int ahead) {
 
 static void PrintPv(SBoard& board, int move, int Depth, int Eval, __int64 Nodes)
 {
-	string score = Eval > 19000 ? "mate " + to_string((MATE_VALUE - Eval) >> 1 +1) :Eval < -19000 ? "mate " + to_string((-MATE_VALUE - Eval) >> 1) :"cp " + to_string(Eval);
+	string score = Eval > 19000 ? "mate " + to_string(((MATE_VALUE - Eval) >> 1) + 1) : Eval < -19000 ? "mate " + to_string((-MATE_VALUE - Eval) >> 1) : "cp " + to_string(Eval);
 	cout << "info depth " << Depth << " score " << score << " time " << (clock() - g_start) << " nodes " << Nodes << " hashfull " << TTPermill() << " pv " << GetPv(board, move, 0) << endl;
 }
 
@@ -490,7 +490,7 @@ static void PrintBestMove(int move) {
 	cout << "bestmove " << MoveToUci(move) << endl;
 }
 
-static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahead, int& BestMove, int bNull)
+static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ply, int& BestMove, int bNull)
 {
 	SMovelist Moves = {};
 	SBoard Board = {};
@@ -514,7 +514,7 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahea
 		if (bNull && depth > 2 && !bInCheck
 			&& ((Color == WHITE && InBoard.WMat > 400) || (Color == BLACK && InBoard.BMat > 400))) {
 			InBoard.color = SWITCH(InBoard.color);
-			Eval = -SearchAlpha(InBoard, -beta, -beta + 1, depth - 3, ahead, NextBest, false);
+			Eval = -SearchAlpha(InBoard, -beta, -beta + 1, depth - 3, ply, NextBest, false);
 			InBoard.color = SWITCH(InBoard.color);
 			if (Eval == -TIME)
 				return TIME;
@@ -525,7 +525,7 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahea
 	}
 
 	if (BestMove < 100 && depth > 2) {
-		Eval = SearchAlpha(InBoard, alpha, beta, depth - 2, ahead + 1, BestMove, true);
+		Eval = SearchAlpha(InBoard, alpha, beta, depth - 2, ply + 1, BestMove, true);
 		if (Eval == TIME) return TIME;
 	}
 	Moves.ScoreMoves(InBoard, Color, BestMove);
@@ -543,18 +543,19 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahea
 			if (Repetition(n64Hash, Board.nMoves - 40, Board.nMoves)) Eval = 0;
 			else {
 				AddRepBoard(n64Hash, Board.nMoves);
-				tt[n64Hash % HASH_SIZE].Read(n64Hash, alpha, beta, NextBest, Eval, depth - 1, ahead);
+				tt[n64Hash % HASH_SIZE].Read(n64Hash, alpha, beta, NextBest, Eval, depth - 1, ply);
 			}
 		}
 		if (Eval == -32000)
 		{
-			Eval = -SearchAlpha(Board, -beta, -alpha, (bInCheck) ? (depth) : (depth - 1), ahead + 1, NextBest, true);
+			Eval = -SearchAlpha(Board, -beta, -alpha, (bInCheck) ? (depth) : (depth - 1), ply + 1, NextBest, true);
 			if (Eval == -TIME) return TIME;
 		}
 		if (depth > 1)
-			tt[n64Hash % HASH_SIZE].Write(n64Hash, alpha, beta, NextBest, Eval, depth - 1, ahead);
+			tt[n64Hash % HASH_SIZE].Write(n64Hash, alpha, beta, NextBest, Eval, depth - 1, ply);
 		if (Eval > alpha) {
-			if (ahead == 0) PrintPv(board, nMove, depth, Eval, g_Nodes);
+			if (ply == 0)
+				PrintPv(board, nMove, depth, Eval, g_Nodes);
 			BestMove = nMove;
 			alpha = Eval;
 			if (alpha >= beta) return beta;
@@ -562,7 +563,8 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahea
 		if (BestMove == 0) BestMove = 1;
 	}
 
-	if (!Moves.m_bCaps && BestMove == 0) { return (bInCheck) ? -MATE_VALUE + ahead : 0; }
+	if (!Moves.m_bCaps && BestMove == 0)
+		return (bInCheck) ? ply - MATE_VALUE : 0;
 	return alpha;
 }
 
@@ -572,7 +574,7 @@ static void SearchIteratively(SBoard& board, int& move, int& eval) {
 	g_start = clock();
 	int SearchEval, SearchMove;
 	for (int depth = 1; depth <= g_max_depth; depth++) {
-		SearchEval = SearchAlpha(board, -MATE_VALUE,MATE_VALUE, depth, 0, SearchMove, false);
+		SearchEval = SearchAlpha(board, -MATE_VALUE, MATE_VALUE, depth, 0, SearchMove, false);
 		if (SearchEval != TIME)
 			eval = SearchEval;
 		if (SearchMove > 100)
@@ -697,6 +699,9 @@ static void UciLoop() {
 				board.DoMove(move);
 				AddRepBoard(TEntry::HashBoard(board), board.nMoves);
 			}
+		}
+		else if (commands[0] == "test") {
+			board.SetFen(SplitString("8/8/8/8/3K4/8/5Q2/3k4 w - - 20 199"));
 		}
 		else if (commands[0] == "quit")
 			return;
