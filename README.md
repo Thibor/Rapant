@@ -13,3 +13,14 @@
     <img src="https://img.shields.io/github/v/release/Thibor/Rapant?color=blue&label=Latest%20release&style=for-the-badge">
     <img src="https://img.shields.io/github/last-commit/Thibor/Rapant?color=critical&style=for-the-badge">
 </div>
+
+## Features
+
+- [x] Alpha beta pruning<br>
+- [x] Quiescence search<br>
+- [x] Transposition table<br>
+- [ ] Bitboard<br>
+- [ ] Mate distance pruning<br>
+- [x] Null move pruning<br>
+- [ ] Futility pruning<br>
+- [ ] Razoring<br>

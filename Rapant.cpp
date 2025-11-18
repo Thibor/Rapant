@@ -11,7 +11,8 @@
 #define S32 signed __int32
 #define S16 signed __int16
 #define S8  signed __int8
-
+#define MATE_VALUE 20000
+#define TIME 300000
 #define NAME "Rapant"
 #define VERSION "2025-10-22"
 
@@ -21,7 +22,6 @@ enum PieceType { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, PT_NB };
 
 const int HASH_SIZE = 1 << 21;
 const int INVALID = 32, EMPTY = 0, WHITE = 8, BLACK = 16;
-const int TIME = 300000;
 const int B_QS = 4, B_KS = 8, W_QS = 1, W_KS = 2;
 const int N_dirs[8] = { -21, -19, -12, -8, 8, 12, 19, 21 };
 const int K_dirs[8] = { 1, 9, 10, 11, -1, -9, -10, -11 };
@@ -443,7 +443,7 @@ struct TEntry {
 
 TEntry tt[HASH_SIZE] = {};
 __int64 g_Nodes, g_CheckNodes;
-int g_max_depth = 0xff;
+int g_max_depth = 100;
 int g_max_time;
 clock_t g_start;
 
@@ -482,9 +482,7 @@ static string GetPv(SBoard& inBoard, int move, int ahead) {
 
 static void PrintPv(SBoard& board, int move, int Depth, int Eval, __int64 Nodes)
 {
-	string score = Eval > 19000 ? "mate " + to_string((20002 - Eval) >> 1) :
-		Eval < -19000 ? "mate " + to_string((-20000 - Eval) >> 1) :
-		"cp " + to_string(Eval);
+	string score = Eval > 19000 ? "mate " + to_string((MATE_VALUE - Eval) >> 1 +1) :Eval < -19000 ? "mate " + to_string((-MATE_VALUE - Eval) >> 1) :"cp " + to_string(Eval);
 	cout << "info depth " << Depth << " score " << score << " time " << (clock() - g_start) << " nodes " << Nodes << " hashfull " << TTPermill() << " pv " << GetPv(board, move, 0) << endl;
 }
 
@@ -504,7 +502,6 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahea
 		g_CheckNodes = g_Nodes + 10000;
 		if (g_max_time && (clock() - g_start) > g_max_time) return TIME;
 	}
-	//if (bInCheck)depth++;
 	if (!bInCheck && depth <= 0) {
 		Eval = (InBoard.color == WHITE) ? InBoard.Evaluate() : -InBoard.Evaluate();
 		if (Eval > alpha)
@@ -565,24 +562,24 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahea
 		if (BestMove == 0) BestMove = 1;
 	}
 
-	if (!Moves.m_bCaps && BestMove == 0) { return (bInCheck) ? -20000 + ahead : 0; }
+	if (!Moves.m_bCaps && BestMove == 0) { return (bInCheck) ? -MATE_VALUE + ahead : 0; }
 	return alpha;
 }
 
-static void ComputerMove(SBoard& board, int& move, int& eval) {
+static void SearchIteratively(SBoard& board, int& move, int& eval) {
 	g_Nodes = 0;
 	g_CheckNodes = g_Nodes + 10000;
 	g_start = clock();
 	int SearchEval, SearchMove;
-	for (int nDepth = 1; nDepth <= g_max_depth; nDepth++) {
-		SearchEval = SearchAlpha(board, -30000, 20001 - nDepth, nDepth, 0, SearchMove, false);
+	for (int depth = 1; depth <= g_max_depth; depth++) {
+		SearchEval = SearchAlpha(board, -MATE_VALUE,MATE_VALUE, depth, 0, SearchMove, false);
 		if (SearchEval != TIME)
 			eval = SearchEval;
 		if (SearchMove > 100)
 			move = SearchMove;
 		if (g_max_time && ((clock() - g_start) > (g_max_time / 2)))
 			break;
-		if (abs(eval) >= (20001 - nDepth))
+		if (abs(eval) >= (MATE_VALUE - depth))
 			break;
 	}
 }
@@ -694,7 +691,7 @@ static void UciLoop() {
 			if (!g_max_time)
 				g_max_time = GetInt(commands, "movetime", 0xffffff);
 			move = 0;
-			ComputerMove(board, move, eval);
+			SearchIteratively(board, move, eval);
 			if (move) {
 				PrintBestMove(move);
 				board.DoMove(move);
