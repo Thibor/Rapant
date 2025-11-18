@@ -2,7 +2,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <time.h>
 
 #define U64 unsigned __int64
 #define U32 unsigned __int32
@@ -12,6 +11,9 @@
 #define S32 signed __int32
 #define S16 signed __int16
 #define S8  signed __int8
+
+#define NAME "Rapant"
+#define VERSION "2025-10-22"
 
 using namespace std;
 
@@ -29,8 +31,8 @@ const int B_dirs[4] = { 9, -9, -11, 11 };
 const int P_dirs[8] = { -10, -20, -9, -11, 10, 20, 9, 11 };
 int inline static SRC(int Move) { return (Move & 0x7f); }
 int inline static DST(int Move) { return ((Move >> 7) & 0x7f); }
-int inline static PROMO(int Move) { return ((Move >> 14) & 7); }
-int inline static VALUE(int Move) { return ((Move >> 17) & 0x3fff); }
+int inline static PROMO(int Move) { return ((Move >> 14) & 3); }
+int inline static VALUE(int Move) { return ((Move >> 16) & 0x3fff); }
 int inline static SWITCH(int Color) { return Color ^ (WHITE | BLACK); }
 int inline static File(int Sq) { return (Sq - 20) % 10; }
 int inline static Rank(int Sq) { return (Sq - 10) / 10; }
@@ -38,8 +40,7 @@ int inline static SQ(int file, int rank) { return 21 + file + rank * 10; }
 int inline static RelativeRank(int Sq, int col) { return col == BLACK ? (Sq - 10) / 10 : 9 - (Sq - 10) / 10; }
 int EvalSq[26 * 128];
 int SetCastle[120];
-const int PieceValues[8] = { 100, 328, 330, 522, 952,5000 };
-const int MPieceValues[8] = { 0, 328, 330, 522, 952,0 };
+const int PieceValues[8] = { 100, 328, 330, 522, 952,0 };
 const int KingEval[10] = { 0, 8, 12, 5, 0, 0, 5, 14, 9, 0 };
 const int CentEval[10] = { 0,-6, -3, -1, 0, 0, -1, -3, -6, 0 };
 const int Cent[10] = { 0, 1, 2, 2, 3, 3, 2, 1, 1, 0 };
@@ -57,25 +58,8 @@ const string SQSTR[65] = {
 };
 string defFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-string name = "Rapant";
-
-#define MONTH (\
-  __DATE__ [2] == 'n' ? (__DATE__ [1] == 'a' ? "01" : "06") \
-: __DATE__ [2] == 'b' ? "02" \
-: __DATE__ [2] == 'r' ? (__DATE__ [0] == 'M' ? "03" : "04") \
-: __DATE__ [2] == 'y' ? "05" \
-: __DATE__ [2] == 'l' ? "07" \
-: __DATE__ [2] == 'g' ? "08" \
-: __DATE__ [2] == 'p' ? "09" \
-: __DATE__ [2] == 't' ? "10" \
-: __DATE__ [2] == 'v' ? "11" \
-: "12")
-#define DAY (std::string(1,(__DATE__[4] == ' ' ?  '0' : (__DATE__[4]))) + (__DATE__[5]))
-#define YEAR ((__DATE__[7]-'0') * 1000 + (__DATE__[8]-'0') * 100 + (__DATE__[9]-'0') * 10 + (__DATE__[10]-'0') * 1)
-
-
 static void PrintWelcome() {
-	cout << name << " " << YEAR << "-" << MONTH << "-" << DAY << endl;
+	cout << NAME << " " << VERSION << endl;
 }
 
 static string MoveToUci(int move) {
@@ -88,11 +72,7 @@ static string MoveToUci(int move) {
 	int sqS = sr * 8 + sf;
 	int sqD = dr * 8 + df;
 	if (sqS < 0 || sqD < 0 || sqS>63 || sqD>63)return "error";
-	int promo = PROMO(move);
-	if (promo > PAWN)
-		return SQSTR[sqS] + SQSTR[sqD] + "pnbrq"[promo];
-	else
-		return SQSTR[sqS] + SQSTR[sqD];
+	return SQSTR[sqS] + SQSTR[sqD];
 }
 
 struct SBoard
@@ -147,18 +127,18 @@ struct SBoard
 		string ele = fen[0];
 		for (char c : ele)
 			switch (c) {
-			case 'p':BMat += MPieceValues[PAWN]; board[sq] = PAWN | BLACK; Eval += EvalSq[((PAWN | BLACK)<< 7) + sq]; sq++; break;
-			case 'n':BMat += MPieceValues[KNIGHT]; board[sq] = KNIGHT | BLACK; Eval += EvalSq[((KNIGHT | BLACK) << 7) + sq]; sq++; break;
-			case 'b':BMat += MPieceValues[BISHOP]; board[sq] = BISHOP | BLACK; Eval += EvalSq[((BISHOP | BLACK) << 7) + sq]; sq++; break;
-			case 'r':BMat += MPieceValues[ROOK]; board[sq] = ROOK | BLACK; Eval += EvalSq[((ROOK | BLACK) << 7) + sq]; sq++; break;
-			case 'q':BMat += MPieceValues[QUEEN]; board[sq] = QUEEN | BLACK; Eval += EvalSq[((QUEEN | BLACK) << 7) + sq]; sq++; break;
-			case 'k':BKsq = sq;  board[sq] = KING | BLACK; sq++; Eval += EvalSq[((KING | BLACK) << 7) + sq]; break;
-			case 'P':WMat += MPieceValues[PAWN]; board[sq] = PAWN | WHITE; Eval += EvalSq[((PAWN | WHITE) << 7) + sq]; sq++; break;
-			case 'N':WMat += MPieceValues[KNIGHT]; board[sq] = KNIGHT | WHITE; Eval += EvalSq[((KNIGHT | WHITE) << 7) + sq]; sq++; break;
-			case 'B':WMat += MPieceValues[BISHOP]; board[sq] = BISHOP | WHITE; Eval += EvalSq[((BISHOP | WHITE) << 7) + sq]; sq++; break;
-			case 'R':WMat += MPieceValues[ROOK]; board[sq] = ROOK | WHITE; Eval += EvalSq[((ROOK | WHITE) << 7) + sq]; sq++; break;
-			case 'Q':WMat += MPieceValues[QUEEN]; board[sq] = QUEEN | WHITE; Eval += EvalSq[((QUEEN | WHITE) << 7) + sq]; sq++; break;
-			case 'K':WKsq = sq; board[sq] = KING | WHITE; Eval += EvalSq[((KING | WHITE) << 7) + sq]; sq++; break;
+			case 'p':BMat += board[sq] = PAWN | BLACK; Eval += EvalSq[(PAWN << 7) + sq]; sq++; break;
+			case 'n':BMat += PieceValues[KNIGHT]; board[sq] = KNIGHT | BLACK; Eval += EvalSq[(KNIGHT << 7) + sq]; sq++; break;
+			case 'b':BMat += PieceValues[BISHOP]; board[sq] = BISHOP | BLACK; Eval += EvalSq[(BISHOP << 7) + sq]; sq++; break;
+			case 'r':BMat += PieceValues[ROOK]; board[sq] = ROOK | BLACK; Eval += EvalSq[(ROOK << 7) + sq]; sq++; break;
+			case 'q':BMat += PieceValues[QUEEN]; board[sq] = QUEEN | BLACK; Eval += EvalSq[(QUEEN << 7) + sq]; sq++; break;
+			case 'k':BKsq = sq;  board[sq] = KING | BLACK; sq++; Eval += EvalSq[(KING << 7) + sq]; break;
+			case 'P':WMat += board[sq] = PAWN | WHITE; Eval += EvalSq[(PAWN << 7) + sq]; sq++; break;
+			case 'N':WMat += PieceValues[KNIGHT]; board[sq] = KNIGHT | WHITE; Eval += EvalSq[(KNIGHT << 7) + sq]; sq++; break;
+			case 'B':WMat += PieceValues[BISHOP]; board[sq] = BISHOP | WHITE; Eval += EvalSq[(BISHOP << 7) + sq]; sq++; break;
+			case 'R':WMat += PieceValues[ROOK]; board[sq] = ROOK | WHITE; Eval += EvalSq[(ROOK << 7) + sq]; sq++; break;
+			case 'Q':WMat += PieceValues[QUEEN]; board[sq] = QUEEN | WHITE; Eval += EvalSq[(QUEEN << 7) + sq]; sq++; break;
+			case 'K':WKsq = sq; board[sq] = KING | WHITE; Eval += EvalSq[(KING << 7) + sq]; sq++; break;
 			case '1': sq += 1; break;
 			case '2': sq += 2; break;
 			case '3': sq += 3; break;
@@ -213,10 +193,12 @@ struct SBoard
 	}
 
 	void AdjustMat(int Dst, const int Mul) {
+		int pt = board[Dst] & 7;
+		if (pt == PAWN) return;
 		if (board[Dst] & WHITE)
-			WMat += Mul * MPieceValues[(board[Dst] & 7)];
+			WMat += Mul * PieceValues[pt];
 		else
-			BMat += Mul * MPieceValues[(board[Dst] & 7)];
+			BMat += Mul * PieceValues[pt];
 	}
 
 	void MovePiece(const int Src, const int Dst, const int Promo) {
@@ -304,13 +286,13 @@ struct SMovelist
 	int m_nMoves, m_nAttacks, m_bCaps;
 	unsigned char* m_pSqs = NULL;
 
-	void inline AddMove(int Src, int Dst, int pt = PAWN) {
+	void inline AddMove(int Src, int Dst) {
 		if (m_bCaps) return;
-		m_Moves[m_nMoves++] = Src + (Dst << 7) + (pt << 14) + (200 << 17);
+		m_Moves[m_nMoves++] = Src + (Dst << 7) + (3 << 14) + (200 << 16);
 	}
 
-	void inline AddAtkMove(int Src, int Dst, int pt = PAWN) {
-		m_Moves[m_nMoves++] = Src + (Dst << 7) + (pt << 14) + ((200 + MPieceValues[(m_pSqs[Dst] & 7)]) << 17);
+	void inline AddAtkMove(int Src, int Dst) {
+		m_Moves[m_nMoves++] = Src + (Dst << 7) + (3 << 14) + ((200 + PieceValues[(m_pSqs[Dst] & 7)]) << 16);
 	}
 
 	void inline GenPieceMoves(const int MoveArray[], const int bSlide, const int nDirs, int Sq, SBoard& Board, const int COLOR) {
@@ -328,32 +310,14 @@ struct SMovelist
 
 	void inline GenPawnMoves(const int MoveArray[], int Sq, SBoard& Board, const int COLOR) {
 		int n = (COLOR == BLACK) ? 4 : 0;
-		int rank = RelativeRank(Sq, COLOR);
 		if (Board.board[Sq + P_dirs[n]] == EMPTY) {
-			if (rank == 7) {
-				for (int pt = KNIGHT; pt < KING; pt++)
-					AddMove(Sq, Sq + P_dirs[n], pt);
-			}
-			else {
-				AddMove(Sq, Sq + P_dirs[n]);
-				if (rank == 2 && Board.board[Sq + P_dirs[n + 1]] == EMPTY)
-					AddMove(Sq, Sq + P_dirs[n + 1]);
-			}
+			int rank = RelativeRank(Sq, COLOR);
+			AddMove(Sq, Sq + P_dirs[n]);
+			if (rank == 2 && Board.board[Sq + P_dirs[n + 1]] == EMPTY)
+				AddMove(Sq, Sq + P_dirs[n + 1]);
 		}
-		if (Sq + P_dirs[n + 2] == Board.EPsq || (Board.board[Sq + P_dirs[n + 2]] & SWITCH(COLOR)))
-			if (rank == 7) {
-				for (int pt = KNIGHT; pt < KING; pt++)
-					AddAtkMove(Sq, Sq + P_dirs[n + 2], pt);
-			}
-			else
-				AddAtkMove(Sq, Sq + P_dirs[n + 2]);
-		if (Sq + P_dirs[n + 3] == Board.EPsq || (Board.board[Sq + P_dirs[n + 3]] & SWITCH(COLOR)))
-			if (rank == 7) {
-				for (int pt = KNIGHT; pt < KING; pt++)
-					AddAtkMove(Sq, Sq + P_dirs[n + 3], pt);
-			}
-			else
-				AddAtkMove(Sq, Sq + P_dirs[n + 3]);
+		if (Sq + P_dirs[n + 2] == Board.EPsq || (Board.board[Sq + P_dirs[n + 2]] & SWITCH(COLOR))) AddAtkMove(Sq, Sq + P_dirs[n + 2]);
+		if (Sq + P_dirs[n + 3] == Board.EPsq || (Board.board[Sq + P_dirs[n + 3]] & SWITCH(COLOR))) AddAtkMove(Sq, Sq + P_dirs[n + 3]);
 	}
 
 	void Generate(SBoard& Board, int bCaps) {
@@ -382,10 +346,10 @@ struct SMovelist
 			int Dst = DST(m_Moves[i]);
 			int Src = SRC(m_Moves[i]);
 			int Piece = Board.board[Src];
-			if (Color == WHITE) m_Moves[i] += ((EvalSq[(Piece << 7) + Dst] - EvalSq[(Piece << 7) + Src]) << 17);
-			if (Color == BLACK) m_Moves[i] -= ((EvalSq[(Piece << 7) + Dst] - EvalSq[(Piece << 7) + Src]) << 17);
-			if ((m_Moves[i] & 0x1FFFF) == (BestMove & 0x1FFFF))
-				m_Moves[i] += (0x800 << 17);
+			if (Color == WHITE) m_Moves[i] += ((EvalSq[(Piece << 7) + Dst] - EvalSq[(Piece << 7) + Src]) << 16);
+			if (Color == BLACK) m_Moves[i] -= ((EvalSq[(Piece << 7) + Dst] - EvalSq[(Piece << 7) + Src]) << 16);
+			if ((m_Moves[i] & 65535) == (BestMove & 65535))
+				m_Moves[i] += (2048 << 16);
 		}
 	}
 
@@ -487,7 +451,8 @@ static void TTClear() {
 	std::memset(tt, 0, sizeof(TEntry) * HASH_SIZE);
 }
 
-static int TTPermill(){
+static int TTPermill()
+{
 	int pm = 0;
 	for (int n = 0; n < 1000; n++)
 		if (tt[n].m_checksum)
@@ -539,6 +504,7 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ahea
 		g_CheckNodes = g_Nodes + 10000;
 		if (g_max_time && (clock() - g_start) > g_max_time) return TIME;
 	}
+	//if (bInCheck)depth++;
 	if (!bInCheck && depth <= 0) {
 		Eval = (InBoard.color == WHITE) ? InBoard.Evaluate() : -InBoard.Evaluate();
 		if (Eval > alpha)
@@ -614,7 +580,7 @@ static void ComputerMove(SBoard& board, int& move, int& eval) {
 			eval = SearchEval;
 		if (SearchMove > 100)
 			move = SearchMove;
-		if (g_max_time && ((clock() - g_start) > (g_max_time / 4)))
+		if (g_max_time && ((clock() - g_start) > (g_max_time / 2)))
 			break;
 		if (abs(eval) >= (20001 - nDepth))
 			break;
@@ -700,7 +666,7 @@ static void ParsePosition(vector<string> commands) {
 }
 
 static void UciLoop() {
-	const int size = 2000;
+	const int size = 4000;
 	char line[size] = {};
 	int move = 1, eval = 0, inc = 0;
 	board.Init();
@@ -711,7 +677,7 @@ static void UciLoop() {
 		if (!commands.size())
 			continue;
 		if (commands[0] == "uci") {
-			cout << "id name " << name << endl;
+			cout << "id name " << NAME << endl;
 			cout << "uciok" << endl;
 		}
 		else if (commands[0] == "isready")
