@@ -1,7 +1,5 @@
 #include <iostream>
 #include <sstream>
-#include <string>
-#include <vector>
 
 #define U64 unsigned __int64
 #define U32 unsigned __int32
@@ -12,11 +10,22 @@
 #define S16 signed __int16
 #define S8  signed __int8
 #define MATE_VALUE 20000
-#define TIME 300000
 #define NAME "Rapant"
 #define VERSION "2025-10-22"
+#define DEFAULT_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 using namespace std;
+
+typedef struct {
+	int stop;
+	int depthLimit;
+	S64 timeStart;
+	S64 timeLimit;
+	U64 nodes;
+	U64 nodesLimit;
+}SearchInfo;
+
+SearchInfo info;
 
 enum PieceType { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, PT_NB };
 
@@ -56,11 +65,6 @@ const string SQSTR[65] = {
 	"a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
 	"none"
 };
-string defFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-static void PrintWelcome() {
-	cout << NAME << " " << VERSION << endl;
-}
 
 static string MoveToUci(int move) {
 	int src = SRC(move);
@@ -116,7 +120,7 @@ struct SBoard
 			}
 	}
 
-	void SetFen(vector<string> fen) {
+	void SetFen(string fen) {
 		Eval = 0;
 		nMoves = 0;
 		WMat = BMat = 0;
@@ -124,8 +128,10 @@ struct SBoard
 		Castling = 0xf;
 		Clear();
 		int sq = 21;
-		string ele = fen[0];
-		for (char c : ele)
+		stringstream ss(fen);
+		string token;
+		ss >> token;
+		for (char c : token)
 			switch (c) {
 			case 'p':Eval += EvalSq[((PAWN | BLACK) << 7) + sq]; board[sq] = PAWN | BLACK; Eval += EvalSq[(PAWN << 7) + sq]; sq++; break;
 			case 'n':Eval += EvalSq[((KNIGHT | BLACK) << 7) + sq]; BMat += PieceValues[KNIGHT]; board[sq] = KNIGHT | BLACK; Eval += EvalSq[(KNIGHT << 7) + sq]; sq++; break;
@@ -150,11 +156,11 @@ struct SBoard
 			case '/': sq += 2; break;
 			}
 
-		ele = fen[1];
-		color = (ele == "w") ? WHITE : BLACK;
+		ss >> token;
+		color = (token == "w") ? WHITE : BLACK;
 
-		ele = fen[2];
-		for (char c : ele)
+		ss >> token;
+		for (char c : token)
 			switch (c)
 			{
 			case 'K':
@@ -171,11 +177,11 @@ struct SBoard
 				break;
 			}
 
-		ele = fen[3];
-		if (ele != "-")
+		ss >> token;
+		if (token != "-")
 		{
-			int file = ele[0] - 'a';
-			int rank = 7 - (ele[1] - '1');
+			int file = token[0] - 'a';
+			int rank = 7 - (token[1] - '1');
 			EPsq = SQ(file, rank);
 		}
 	}
@@ -442,10 +448,6 @@ struct TEntry {
 };
 
 TEntry tt[HASH_SIZE] = {};
-__int64 g_Nodes, g_CheckNodes;
-int g_max_depth = 100;
-int g_max_time;
-clock_t g_start;
 
 static void TTClear() {
 	std::memset(tt, 0, sizeof(TEntry) * HASH_SIZE);
@@ -480,14 +482,14 @@ static string GetPv(SBoard& inBoard, int move, int ahead) {
 	return uci;
 }
 
-static void PrintPv(SBoard& board, int move, int Depth, int Eval, __int64 Nodes)
+static void PrintPv(SBoard& board, int move, int Depth, int Eval)
 {
 	string score = Eval > 19000 ? "mate " + to_string(((MATE_VALUE - Eval) >> 1) + 1) : Eval < -19000 ? "mate " + to_string((-MATE_VALUE - Eval) >> 1) : "cp " + to_string(Eval);
-	cout << "info depth " << Depth << " score " << score << " time " << (clock() - g_start) << " nodes " << Nodes << " hashfull " << TTPermill() << " pv " << GetPv(board, move, 0) << endl;
+	cout << "info depth " << Depth << " score " << score << " time " << (clock() - info.timeStart) << " nodes " << info.nodes << " hashfull " << TTPermill() << " pv " << GetPv(board, move, 0) << endl;
 }
 
 static void PrintBestMove(int move) {
-	cout << "bestmove " << MoveToUci(move) << endl;
+	cout << "bestmove " << MoveToUci(move) << endl << flush;
 }
 
 static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ply, int& BestMove, int bNull)
@@ -496,12 +498,13 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ply,
 	SBoard Board = {};
 	int Color = InBoard.color, Eval, NextBest = 0, nMove, bInCheck = InBoard.IsCheck(Color);
 	U64 n64Hash = 0;
-	if (depth > g_max_depth)
-		return TIME;
-	if (g_Nodes > g_CheckNodes) {
-		g_CheckNodes = g_Nodes + 10000;
-		if (g_max_time && (clock() - g_start) > g_max_time) return TIME;
+	if (!(++info.nodes & 0xffff)) {
+		if ((info.timeLimit && (clock() - info.timeStart) > info.timeLimit) ||
+			(info.nodesLimit && info.nodes > info.nodesLimit))
+			info.stop=true;
 	}
+	if(info.stop)
+		return 0;
 	if (!bInCheck && depth <= 0) {
 		Eval = (InBoard.color == WHITE) ? InBoard.Evaluate() : -InBoard.Evaluate();
 		if (Eval > alpha)
@@ -515,9 +518,9 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ply,
 			&& ((Color == WHITE && InBoard.WMat > 400) || (Color == BLACK && InBoard.BMat > 400))) {
 			InBoard.color = SWITCH(InBoard.color);
 			Eval = -SearchAlpha(InBoard, -beta, -beta + 1, depth - 3, ply, NextBest, false);
+			if (info.stop)
+				return 0;
 			InBoard.color = SWITCH(InBoard.color);
-			if (Eval == -TIME)
-				return TIME;
 			if (Eval >= beta)
 				return beta;
 		}
@@ -526,15 +529,16 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ply,
 
 	if (BestMove < 100 && depth > 2) {
 		Eval = SearchAlpha(InBoard, alpha, beta, depth - 2, ply + 1, BestMove, true);
-		if (Eval == TIME) return TIME;
+		if (info.stop) return 0;
 	}
 	Moves.ScoreMoves(InBoard, Color, BestMove);
 
 	BestMove = 0;
 	while (Moves.GetNextMove(nMove)) {
+		if(info.stop)
+			return 0;
 		Board = InBoard;
 		Board.DoMove(nMove);
-		g_Nodes++;
 		if (Board.IsCheck(Color)) continue;
 		NextBest = 0;
 		Eval = -32000;
@@ -549,13 +553,13 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ply,
 		if (Eval == -32000)
 		{
 			Eval = -SearchAlpha(Board, -beta, -alpha, (bInCheck) ? (depth) : (depth - 1), ply + 1, NextBest, true);
-			if (Eval == -TIME) return TIME;
+			if (info.stop) return 0;
 		}
 		if (depth > 1)
 			tt[n64Hash % HASH_SIZE].Write(n64Hash, alpha, beta, NextBest, Eval, depth - 1, ply);
 		if (Eval > alpha) {
 			if (ply == 0)
-				PrintPv(board, nMove, depth, Eval, g_Nodes);
+				PrintPv(board, nMove, depth, Eval);
 			BestMove = nMove;
 			alpha = Eval;
 			if (alpha >= beta) return beta;
@@ -568,22 +572,20 @@ static int SearchAlpha(SBoard& InBoard, int alpha, int beta, int depth, int ply,
 	return alpha;
 }
 
-static void SearchIteratively(SBoard& board, int& move, int& eval) {
-	g_Nodes = 0;
-	g_CheckNodes = g_Nodes + 10000;
-	g_start = clock();
-	int SearchEval, SearchMove;
-	for (int depth = 1; depth <= g_max_depth; depth++) {
-		SearchEval = SearchAlpha(board, -MATE_VALUE, MATE_VALUE, depth, 0, SearchMove, false);
-		if (SearchEval != TIME)
-			eval = SearchEval;
-		if (SearchMove > 100)
-			move = SearchMove;
-		if (g_max_time && ((clock() - g_start) > (g_max_time / 2)))
+static int SearchIteratively(SBoard& board) {
+	int bstMove=0;
+	int move = 0;
+	for (int depth = 1; depth <= info.depthLimit; depth++) {
+		int score = SearchAlpha(board, -MATE_VALUE, MATE_VALUE, depth, 0,move, false);
+		if (info.stop)
 			break;
-		if (abs(eval) >= (MATE_VALUE - depth))
+		bstMove = move;
+		if (info.timeLimit && ((clock() - info.timeStart) > (info.timeLimit / 2)))
+			break;
+		if (abs(score) >= (MATE_VALUE - depth))
 			break;
 	}
+	return bstMove;
 }
 
 static int UciToMove(string s) {
@@ -593,24 +595,6 @@ static int UciToMove(string s) {
 	if (s[4] == 'b' || s[4] == 'B') Upgrade = 1;
 	if (s[4] == 'r' || s[4] == 'R') Upgrade = 2;
 	return Src + (Dst << 7) + (Upgrade << 14);
-}
-
-static vector<string> SplitString(string s) {
-	vector<string> words;
-	istringstream iss(s);
-	string word;
-	while (iss >> word)
-		words.push_back(word);
-	return words;
-}
-
-static int GetInt(vector<string> vs, string name, int def) {
-	bool r = false;
-	for (string s : vs) {
-		if (r) return stoi(s);
-		r = s == name;
-	}
-	return def;
 }
 
 static void PrintBoard() {
@@ -639,77 +623,118 @@ static void PrintBoard() {
 	cout << t << endl;
 }
 
-static void ParsePosition(vector<string> commands) {
-	vector<string> fen = {};
-	vector<string> moves = {};
-	int mark = 0;
-	for (int i = 1; i < commands.size(); i++) {
-		if (mark == 1)
-			fen.push_back(commands[i]);
-		if (mark == 2)
-			moves.push_back(commands[i]);
-		if (commands[i] == "fen")
-			mark = 1;
-		else if (commands[i] == "moves")
-			mark = 2;
+static void ParsePosition(string command) {
+	string fen = DEFAULT_FEN;
+	stringstream ss(command);
+	string token;
+	ss >> token;
+	if (token != "position")
+		return;
+	ss >> token;
+	if (token == "startpos")
+		ss >> token;
+	else if (token == "fen") {
+		fen = "";
+		while (ss >> token && token != "moves")
+			fen += token + " ";
+		fen.pop_back();
 	}
-	if (fen.size() != 6)
-		fen = SplitString(defFen);
 	board.SetFen(fen);
-	for (string m : moves)
-	{
-		int move = UciToMove(m);
+	while (ss >> token) {
+		int move = UciToMove(token);
 		board.DoMove(move);
 		AddRepBoard(TEntry::HashBoard(board), board.nMoves);
 	}
 }
 
+static void ParseGo(string command) {
+	stringstream ss(command);
+	string token;
+	ss >> token;
+	if (token != "go")
+		return;
+	info.stop = false;
+	info.nodes = 0;
+	info.depthLimit = 64;
+	info.nodesLimit = 0;
+	info.timeLimit = 0;
+	info.timeStart = clock();
+	int wtime = 0;
+	int btime = 0;
+	int winc = 0;
+	int binc = 0;
+	int movestogo = 32;
+	char* argument = NULL;
+	while (ss >> token) {
+		if (token == "wtime") {
+			ss >> wtime;
+		}
+		else if (token == "btime") {
+			ss >> btime;
+		}
+		else if (token == "winc") {
+			ss >> winc;
+		}
+		else if (token == "binc") {
+			ss >> binc;
+		}
+		else if (token == "movestogo") {
+			ss >> movestogo;
+		}
+		else if (token == "movetime") {
+			ss >> info.timeLimit;
+		}
+		else if (token == "depth") {
+			ss >> info.depthLimit;
+		}
+		else if (token == "nodes") {
+			ss >> info.nodesLimit;
+		}
+	}
+	int time = board.color == WHITE ? wtime : btime;
+	int inc = board.color == WHITE ? winc : binc;
+	if (time)
+		info.timeLimit = min(time / movestogo + inc, time / 2);
+}
+
+static void UciCommand(string command) {
+	if (command.empty())
+		return;
+	if (command == "uci")
+	{
+		cout << "id name " << NAME << endl;
+		cout << "uciok" << endl;
+	}
+	else if (command == "isready")
+		cout << "readyok" << endl;
+	else if (command.substr(0, 8) == "position") {
+		ParsePosition(command);
+	}
+	else if (command.substr(0, 2) == "go") {
+		ParseGo(command);
+		int move = SearchIteratively(board);
+		if (move)
+			PrintBestMove(move);
+	}
+	else if (command == "print") {
+		PrintBoard();
+	}
+	else if (command == "quit")
+		exit(0);
+}
+
 static void UciLoop() {
-	const int size = 4000;
-	char line[size] = {};
-	int move = 1, eval = 0, inc = 0;
-	board.Init();
-	board.SetFen(SplitString(defFen));
+string line;
 	while (true) {
-		if (!fgets(line, size, stdin)) return;
-		vector<string> commands = SplitString(line);
-		if (!commands.size())
-			continue;
-		if (commands[0] == "uci") {
-			cout << "id name " << NAME << endl;
-			cout << "uciok" << endl;
-		}
-		else if (commands[0] == "isready")
-			cout << "readyok" << endl;
-		else if (commands[0] == "ucinewgame")
-			TTClear();
-		else if (commands[0] == "print")
-			PrintBoard();
-		else if (commands[0] == "position")
-			ParsePosition(commands);
-		else if (commands[0] == "go") {
-			g_max_depth = GetInt(commands, "depth", 0xff);
-			g_max_time = GetInt(commands, board.color == WHITE ? "wtime" : "btime", 0) / 30;
-			if (!g_max_time)
-				g_max_time = GetInt(commands, "movetime", 0xffffff);
-			move = 0;
-			SearchIteratively(board, move, eval);
-			if (move) {
-				PrintBestMove(move);
-				board.DoMove(move);
-				AddRepBoard(TEntry::HashBoard(board), board.nMoves);
-			}
-		}
-		else if (commands[0] == "test") {
-			board.SetFen(SplitString("8/8/8/8/3K4/8/5Q2/3k4 w - - 20 199"));
-		}
-		else if (commands[0] == "quit")
-			return;
+		getline(cin, line);
+		UciCommand(line);
 	}
 }
 
 int main() {
-	PrintWelcome();
+	cout << NAME << " " << VERSION << endl;
 	TEntry::Create_HashFunction();
+	board.Init();
+	board.SetFen(DEFAULT_FEN);
 	UciLoop();
 }
