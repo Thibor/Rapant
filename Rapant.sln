@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35806.99 d17.13
+VisualStudioVersion = 17.14.36908.2 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Rapant", "Rapant.vcxproj", "{E153C2E6-035B-C7E8-2FEB-87616C1A1AA3}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RapAnt", "RapAnt.vcxproj", "{E153C2E6-035B-C7E8-2FEB-87616C1A1AA3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,6 +26,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {4BEFEB83-3F01-421E-9D55-F1214B4D718F}
+		SolutionGuid = {C53D4BB4-A573-42FB-BCCA-263783AA72BF}
 	EndGlobalSection
 EndGlobal
