@@ -12,7 +12,7 @@ using namespace std;
 #define S32 signed __int32
 #define S16 signed __int16
 #define S8  signed __int8
-#define MAX_DEPTH 100
+#define MAX_PLY 100
 #define INF 32000
 #define MATE 31000
 #define NAME "Rapant"
@@ -53,13 +53,13 @@ int inline static File(int Sq) { return (Sq - 20) % 10; }
 int inline static Rank(int Sq) { return (Sq - 10) / 10; }
 int inline static SQ(int file, int rank) { return 21 + file + rank * 10; }
 int inline static RelativeRank(int Sq, int col) { return col == BLACK ? (Sq - 10) / 10 : 9 - (Sq - 10) / 10; }
-int EvalSq[26 * 128];
-int SetCastle[120];
+int EvalSq[26 * 128]{};
+int SetCastle[120]{};
 const int PieceValues[8] = { 100, 328, 330, 522, 952,0 };
 const int KingEval[10] = { 0, 8, 12, 5, 0, 0, 5, 14, 9, 0 };
 const int CentEval[10] = { 0,-6, -3, -1, 0, 0, -1, -3, -6, 0 };
 const int Cent[10] = { 0, 1, 2, 2, 3, 3, 2, 1, 1, 0 };
-Stack stack[128]{};
+Stack stack[MAX_PLY]{};
 
 const string SQSTR[65] = {
 	"a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
@@ -340,8 +340,10 @@ struct Movelist
 					AddMove(Sq, tempSq);
 					tempSq += MoveArray[i];
 				}
-			if (Board.board[tempSq] & SWITCH(COLOR)) AddAtkMove(Sq, tempSq);
-			else if (Board.board[tempSq] == EMPTY)	AddMove(Sq, tempSq);
+			if (Board.board[tempSq] & SWITCH(COLOR))
+				AddAtkMove(Sq, tempSq);
+			else if (Board.board[tempSq] == EMPTY)
+				AddMove(Sq, tempSq);
 		}
 	}
 
@@ -442,10 +444,14 @@ static int Permill() {
 	return pm;
 }
 
-static void CheckUp() {
-	if ((info.timeLimit && (clock() - info.timeStart) > info.timeLimit) ||
-		(info.nodesLimit && info.nodes > info.nodesLimit))
-		info.stop = true;
+static int CheckUp() {
+	if (!(++info.nodes & 0xffff)) {
+		if (info.timeLimit && (clock() - info.timeStart) > info.timeLimit)
+			info.stop = true;
+		if (info.nodesLimit && info.nodes > info.nodesLimit)
+			info.stop = true;
+	}
+	return info.stop;
 }
 
 static bool IsRepetition(U64 hash) {
@@ -458,9 +464,8 @@ static bool IsRepetition(U64 hash) {
 static string GetPv(Position& pos, int move) {
 	Position npos = pos;
 	string uci = MoveToUci(move);
-	int color = npos.color;
 	npos.DoMove(move);
-	if (npos.IsCheck(color))
+	if (npos.IsCheck(npos.color))
 		return "";
 	U64 hash = GetHash(npos);
 	if (IsRepetition(hash))
@@ -469,7 +474,7 @@ static string GetPv(Position& pos, int move) {
 	if (!entry.move)
 		return uci;
 	string hashMove = MoveToUci(entry.move);
-	Movelist moves = {};
+	Movelist moves{};
 	moves.Generate(npos, 0);
 	hash_history[hash_count++] = hash;
 	for (int i = 0; i < moves.count; i++)
@@ -481,7 +486,7 @@ static string GetPv(Position& pos, int move) {
 
 static void PrintInfo(Position& board, int move, int depth, int score) {
 	cout << "info depth " << depth << " score ";
-	if (abs(score) < MATE - MAX_DEPTH)
+	if (abs(score) < MATE - MAX_PLY)
 		cout << "cp " << score;
 	else
 		cout << "mate " << (score > 0 ? (MATE - score + 1) >> 1 : -(MATE + score) >> 1);
@@ -492,14 +497,12 @@ static void PrintBestMove(int move) {
 	cout << "bestmove " << MoveToUci(move) << endl << flush;
 }
 
-static int SearchAlpha(Position& pos, int alpha, int beta, int depth, int ply, Stack* const stack, bool doNull=true) {
+static int SearchAlpha(Position& pos, int alpha, int beta, int depth, int ply, Stack* const stack, bool doNull = true) {
 	int Color = pos.color, NextBest = 0, move;
-	if (!(++info.nodes & 0xffff))
-		CheckUp();
-	if (info.stop)
+	if (CheckUp())
 		return 0;
 	int static_eval = (pos.color == WHITE) ? pos.Evaluate() : -pos.Evaluate();
-	if (ply > 127)
+	if (ply >= MAX_PLY)
 		return static_eval;
 	bool in_check = pos.IsCheck(Color);
 	depth += in_check;
@@ -520,13 +523,10 @@ static int SearchAlpha(Position& pos, int alpha, int beta, int depth, int ply, S
 	}
 	Movelist moves;
 	moves.Generate(pos, in_qsearch);
-
 	U64 hash = GetHash(pos);
 	if (ply > 0 && !in_qsearch)
 		if (IsRepetition(hash))
 			return 0;
-
-
 	TTEntry& tt_entry = tt[hash % HASH_SIZE];
 	int tt_move = 0;
 	if (tt_entry.hash == hash) {
@@ -540,9 +540,9 @@ static int SearchAlpha(Position& pos, int alpha, int beta, int depth, int ply, S
 				return tt_entry.score;
 		}
 	}
-	else if (depth > 3)depth--;
+	else if (depth > 3)
+		depth--;
 	moves.ScoreMoves(pos, Color, tt_move);
-
 	int best_move = 0;
 	int best_score = -INF;
 	U8 tt_flag = LOWER;
@@ -553,10 +553,8 @@ static int SearchAlpha(Position& pos, int alpha, int beta, int depth, int ply, S
 		if (npos.IsCheck(Color)) continue;
 		NextBest = 0;
 		int score = -SearchAlpha(npos, -beta, -alpha, depth - 1, ply + 1, stack);
-		if (info.stop) {
-			hash_count--;
-			return 0;
-		}
+		if (info.stop)
+			break;
 		if (best_score < score)
 			best_score = score;
 		if (alpha < score) {
@@ -573,6 +571,8 @@ static int SearchAlpha(Position& pos, int alpha, int beta, int depth, int ply, S
 		}
 	}
 	hash_count--;
+	if (info.stop)
+		return 0;
 	if (best_score == -INF)
 		return in_qsearch ? alpha : in_check ? ply - MATE : 0;
 	if (tt_entry.hash != hash || depth >= tt_entry.depth || tt_flag == EXACT) {
